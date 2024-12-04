@@ -15,6 +15,10 @@ HomographyTransformer::HomographyTransformer(int new_plane_width_, int new_plane
     mapping = cv::Mat();
 }
 
+cv::Mat HomographyTransformer::get_homography_mat(){
+    return H;
+} 
+
 void HomographyTransformer::compute_homography(const std::vector<cv::Point2f>& image_points,
                                                const std::vector<cv::Point2f>& ground_points)
 {

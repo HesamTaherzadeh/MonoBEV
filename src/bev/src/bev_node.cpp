@@ -16,6 +16,7 @@
 #include <yaml-cpp/yaml.h>
 #include <onnxruntime/onnxruntime_cxx_api.h>
 #include "BEVTransformer.hpp"
+#include "bev_interface/msg/homography.hpp" 
 
 class BEVNode : public rclcpp::Node
 {
@@ -49,6 +50,8 @@ public:
         this->declare_parameter<std::vector<double>>("camera_intrinsics.K", std::vector<double>(9));
         this->declare_parameter<std::vector<double>>("camera_intrinsics.dist", std::vector<double>(5));
 
+        homography_matrix = cv::Mat::zeros(3, 3, CV_64F);
+
         // Load parameters into member variables
         load_parameters();
 
@@ -57,6 +60,8 @@ public:
         image_subscriber_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/kitti/camera_color_left/image_raw", 0,
             std::bind(&BEVNode::image_callback, this, std::placeholders::_1));
+        
+        homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("homography", 10);
 
         // Initialize model and camera parameters
         load_camera_parameters();
@@ -138,8 +143,19 @@ private:
                             original_image.cols, original_image.rows, intrinsic_image_width_, intrinsic_image_height_);
             }
 
-            // Process the image to generate the BEV
             cv::Mat bev_image = process_image_to_bev(original_image);
+
+
+            auto homography_msg = bev_interface::msg::Homography();
+            homography_msg.header = msg->header;
+
+           for (int i = 0; i < 3; ++i)
+            {
+                for (int j = 0; j < 3; ++j)
+                {
+                    homography_msg.matrix[i * 3 + j] = homography_matrix.at<double>(i, j);
+                }
+            }
 
             if (bev_image.empty())
             {
@@ -281,6 +297,8 @@ cv::Mat process_image_to_bev(const cv::Mat& input_image)
     {
         transformer.compute_homography(image_points, ground_points);
     }
+
+
     catch (const std::exception& e)
     {
         RCLCPP_ERROR(this->get_logger(), "Error computing homography: %s", e.what());
@@ -304,6 +322,7 @@ void publish_bev_image(const cv::Mat& bev_image)
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscriber_;
+    rclcpp::Publisher<bev_interface::msg::Homography>::SharedPtr homography_publisher_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_publisher_;
 
     std::string model_path_;
@@ -318,6 +337,7 @@ void publish_bev_image(const cv::Mat& bev_image)
     cv::Mat cam_dist_;
     CameraIntrinsic intrinsic_;
     bool should_publish_bev_ = true;
+    cv::Mat homography_matrix;
 
     int intrinsic_image_width_;
     int intrinsic_image_height_;

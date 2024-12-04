@@ -22,6 +22,9 @@ find_package(std_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(onnxruntime REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(bev_interface REQUIRED)
 
 # Include directories
 include_directories(
@@ -51,6 +54,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   nav_msgs
   std_msgs
   pcl_conversions
+  bev_interface
 )
 
 # Link OpenCV libraries
@@ -80,6 +84,7 @@ ament_export_dependencies(
   std_msgs
   onnxruntime
   OpenCV
+  rosidl_default_runtime
 )
 
 ament_package()

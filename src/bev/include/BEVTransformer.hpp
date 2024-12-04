@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include "bev_interface/msg/homography.hpp" 
+#include <std_msgs/msg/header.hpp>
 
 class CameraIntrinsic {
 public:
@@ -30,6 +32,7 @@ public:
     HomographyTransformer(int new_plane_width_, int new_plane_height_, const CameraIntrinsic& intrinsic_,
                           const cv::Mat& depth_map_ = cv::Mat(), int multiplication_ratio_ = 96,
                           int starting_x_ = 0, int starting_y_ = 0);
+    cv::Mat get_homography_mat();
 
     void compute_homography(const std::vector<cv::Point2f>& image_points,
                             const std::vector<cv::Point2f>& ground_points);
