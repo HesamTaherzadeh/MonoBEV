@@ -1,0 +1,14 @@
+bev_node:
+  ros__parameters:
+    model_path: "/home/hesam/Desktop/playground/depth_node/model/unidepth/unidepthv2_vits14_simp.onnx"
+    output_width: 1500
+    output_height: 1000
+    intrinsic_image_width: 1241
+    intrinsic_image_height: 376
+    multiplication_ratio: 125
+    starting_x: -1500
+    starting_y: 1000
+    camera_intrinsics:
+      K: [721.5377, 0.0, 609.5593, 0.0, 721.5377, 172.854, 0.0, 0.0, 1.0]
+      dist: [-0.171, 0.189, 0.000, 0.000, 0.000]
+

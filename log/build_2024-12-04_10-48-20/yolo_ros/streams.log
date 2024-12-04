@@ -1,0 +1,33 @@
+[0.683s] Invoking command in '/home/hesam/Desktop/Repos/yolo_ros/src/yolo_ros/yolo_ros': CMAKE_PREFIX_PATH=/home/hesam/Desktop/Repos/yolo_ros/install/yolo_msgs:/home/hesam/Desktop/Repos/yolo_ros/install/yolo_bringup:/home/hesam/Desktop/Repos/yolo_ros/install/bev LD_LIBRARY_PATH=/home/hesam/Desktop/Repos/yolo_ros/install/yolo_msgs/lib:/usr/local/lib:/usr/local/cuda-11.8/lib64:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/lib/x86_64-linux-gnu/gazebo-11/plugins PYTHONPATH=/home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/prefix_override:/home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base ../../../build/yolo_ros build --build-base /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build install --record /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/install.log --single-version-externally-managed install_data
+[0.789s] /home/hesam/.local/lib/python3.10/site-packages/setuptools/_distutils/dist.py:261: UserWarning: Unknown distribution option: 'tests_require'
+[0.789s]   warnings.warn(msg)
+[0.847s] running egg_info
+[0.857s] writing ../../../build/yolo_ros/yolo_ros.egg-info/PKG-INFO
+[0.857s] writing dependency_links to ../../../build/yolo_ros/yolo_ros.egg-info/dependency_links.txt
+[0.858s] writing entry points to ../../../build/yolo_ros/yolo_ros.egg-info/entry_points.txt
+[0.858s] writing requirements to ../../../build/yolo_ros/yolo_ros.egg-info/requires.txt
+[0.858s] writing top-level names to ../../../build/yolo_ros/yolo_ros.egg-info/top_level.txt
+[0.879s] reading manifest file '../../../build/yolo_ros/yolo_ros.egg-info/SOURCES.txt'
+[0.880s] writing manifest file '../../../build/yolo_ros/yolo_ros.egg-info/SOURCES.txt'
+[0.881s] running build
+[0.881s] running build_py
+[0.881s] copying yolo_ros/__init__.py -> /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build/lib/yolo_ros
+[0.881s] copying yolo_ros/tracking_node.py -> /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build/lib/yolo_ros
+[0.881s] copying yolo_ros/debug_node.py -> /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build/lib/yolo_ros
+[0.881s] copying yolo_ros/detect_3d_node.py -> /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build/lib/yolo_ros
+[0.881s] copying yolo_ros/yolo_node.py -> /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build/lib/yolo_ros
+[0.881s] running install
+[0.884s] running install_lib
+[0.895s] running install_data
+[0.895s] copying resource/yolo_ros -> /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/share/ament_index/resource_index/packages
+[0.896s] copying package.xml -> /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/share/yolo_ros
+[0.896s] running install_egg_info
+[0.907s] removing '/home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/python3.10/site-packages/yolo_ros-0.0.0-py3.10.egg-info' (and everything under it)
+[0.907s] Copying ../../../build/yolo_ros/yolo_ros.egg-info to /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/python3.10/site-packages/yolo_ros-0.0.0-py3.10.egg-info
+[0.908s] running install_scripts
+[1.007s] Installing debug_node script to /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/yolo_ros
+[1.007s] Installing detect_3d_node script to /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/yolo_ros
+[1.007s] Installing tracking_node script to /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/yolo_ros
+[1.008s] Installing yolo_node script to /home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/yolo_ros
+[1.008s] writing list of installed files to '/home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/install.log'
+[1.033s] Invoked command in '/home/hesam/Desktop/Repos/yolo_ros/src/yolo_ros/yolo_ros' returned '0': CMAKE_PREFIX_PATH=/home/hesam/Desktop/Repos/yolo_ros/install/yolo_msgs:/home/hesam/Desktop/Repos/yolo_ros/install/yolo_bringup:/home/hesam/Desktop/Repos/yolo_ros/install/bev LD_LIBRARY_PATH=/home/hesam/Desktop/Repos/yolo_ros/install/yolo_msgs/lib:/usr/local/lib:/usr/local/cuda-11.8/lib64:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/lib/x86_64-linux-gnu/gazebo-11/plugins PYTHONPATH=/home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/prefix_override:/home/hesam/Desktop/Repos/yolo_ros/install/yolo_ros/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated setup.py egg_info --egg-base ../../../build/yolo_ros build --build-base /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/build install --record /home/hesam/Desktop/Repos/yolo_ros/build/yolo_ros/install.log --single-version-externally-managed install_data

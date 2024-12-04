@@ -1,0 +1,28 @@
+[35m[1mConsolidate compiler generated dependencies of target bev_node[0m
+[ 33%] [32mBuilding CXX object CMakeFiles/bev_node.dir/src/BEVTransformer.cpp.o[0m
+[ 66%] [32m[1mLinking CXX executable bev_node[0m
+[100%] Built target bev_node
+-- Install configuration: ""
+-- Installing: /home/hesam/Desktop/Repos/yolo_ros/install/bev/lib/bev/bev_node
+-- Set runtime path of "/home/hesam/Desktop/Repos/yolo_ros/install/bev/lib/bev/bev_node" to ""
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/launch
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/launch/run.launch.py
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cfg
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cfg/cfg.yaml
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/ament_index/resource_index/package_run_dependencies/bev
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/ament_index/resource_index/parent_prefix_path/bev
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/environment/ament_prefix_path.sh
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/environment/ament_prefix_path.dsv
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/environment/path.sh
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/environment/path.dsv
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/local_setup.bash
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/local_setup.sh
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/local_setup.zsh
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/local_setup.dsv
+-- Installing: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/package.dsv
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/ament_index/resource_index/packages/bev
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cmake/ament_cmake_export_include_directories-extras.cmake
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cmake/bevConfig.cmake
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/cmake/bevConfig-version.cmake
+-- Up-to-date: /home/hesam/Desktop/Repos/yolo_ros/install/bev/share/bev/package.xml
