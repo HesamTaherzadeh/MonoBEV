@@ -1,6 +1,6 @@
 bev_node:
   ros__parameters:
-    model_path: "/home/hesam/Desktop/playground/depth_node/model/unidepth/unidepthv2_vits14_simp.onnx"
+    model_path: "/home/hesam/Desktop/depth_node/model/unidepth/unidepthv2_vits14_simp.onnx"
     output_width: 1500
     output_height: 1000
     intrinsic_image_width: 1241

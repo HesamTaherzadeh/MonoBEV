@@ -25,6 +25,7 @@ find_package(OpenCV REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(bev_interface REQUIRED)
+find_package(yolo_msgs REQUIRED)
 
 # Include directories
 include_directories(
@@ -55,6 +56,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   std_msgs
   pcl_conversions
   bev_interface
+  yolo_msgs
 )
 
 # Link OpenCV libraries
@@ -71,6 +73,11 @@ install(DIRECTORY cfg/
   DESTINATION share/${PROJECT_NAME}/cfg
 )
 
+install(
+  PROGRAMS
+    scripts/ogm.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Export dependencies
 ament_export_include_directories(include)
@@ -85,6 +92,8 @@ ament_export_dependencies(
   onnxruntime
   OpenCV
   rosidl_default_runtime
+  bev_interface
+  yolo_msgs
 )
 
 ament_package()

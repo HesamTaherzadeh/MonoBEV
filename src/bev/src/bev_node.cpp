@@ -63,6 +63,7 @@ public:
         
         homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("homography", 10);
 
+
         // Initialize model and camera parameters
         load_camera_parameters();
         load_model();
@@ -156,6 +157,9 @@ private:
                     homography_msg.matrix[i * 3 + j] = homography_matrix.at<double>(i, j);
                 }
             }
+
+        homography_publisher_->publish(homography_msg);
+            
 
             if (bev_image.empty())
             {
