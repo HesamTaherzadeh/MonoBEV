@@ -19,7 +19,6 @@ def generate_launch_description():
             package='bev',
             executable='bev_node',
             name='bev_node',
-            output='screen',
             parameters=[os.path.join(bev_package_dir, 'cfg', 'cfg.yaml')]
         ),
         ExecuteProcess(
@@ -29,11 +28,12 @@ def generate_launch_description():
             ],
             output='log'
         ),
+        
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(yolo_launch_file_path),
             launch_arguments={
-                'input_image_topic': '/kitti/camera_color_left/image_raw'
-            }.items()
+                'input_image_topic': 'rgb',
+                }.items()
         ),
         ExecuteProcess(
             cmd=['ros2', 'run', 'rviz2', 'rviz2', '-d', rviz_file_path],
