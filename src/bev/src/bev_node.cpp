@@ -1,8 +1,5 @@
 #include <iostream>
 
-// Enable or disable debug output
-// #define BEV_DEBUG_OUTPUT
-
 #ifdef BEV_DEBUG_OUTPUT
     #define DEBUG_LOG(msg) std::cout << msg << std::endl
 #else
@@ -60,9 +57,9 @@ public:
         // Create publishers and subscribers
         rclcpp::QoS qos_best_effort = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor_data));
 
-        image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("BEV", 10);
-        depth_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("depth", 10);
-        rgb_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("rgb", 10);
+        image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("BEV", qos_best_effort);
+        depth_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("depth", qos_best_effort);
+        rgb_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("rgb", qos_best_effort);
 
         camera_info_publisher_ = this->create_publisher<sensor_msgs::msg::CameraInfo>("camera_params", qos_best_effort);
 
@@ -70,7 +67,7 @@ public:
             "/kitti/camera_color_left/image_raw", 0,
             std::bind(&BEVNode::image_callback, this, std::placeholders::_1));
         
-        homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("homography", 10);
+        homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("homography", qos_best_effort);
 
 
         // Initialize model and camera parameters
@@ -136,12 +133,12 @@ private:
         camera_info_msg.height = intrinsic_image_height_;
         camera_info_msg.distortion_model = "plumb_bob";
         camera_info_msg.k = {cam_k_.at<double>(0), cam_k_.at<double>(1), cam_k_.at<double>(2), cam_k_.at<double>(3), cam_k_.at<double>(4), cam_k_.at<double>(5), cam_k_.at<double>(6), cam_k_.at<double>(7), cam_k_.at<double>(8)};
-        camera_info_msg.p = {cam_k_.at<double>(0), cam_k_.at<double>(1), cam_k_.at<double>(2), 
-                     0.0, 
-                     cam_k_.at<double>(3), cam_k_.at<double>(4), cam_k_.at<double>(5), 
-                     0.0, 
-                     cam_k_.at<double>(6), cam_k_.at<double>(7), cam_k_.at<double>(8), 
-                     0.0};
+        // camera_info_msg.p = {cam_k_.at<double>(0), cam_k_.at<double>(1), cam_k_.at<double>(2), 
+        //              0.0, 
+        //              cam_k_.at<double>(3), cam_k_.at<double>(4), cam_k_.at<double>(5), 
+        //              0.0, 
+        //              cam_k_.at<double>(6), cam_k_.at<double>(7), cam_k_.at<double>(8), 
+        //              0.0};
         camera_info_publisher_->publish(camera_info_msg);
     }
 
@@ -190,12 +187,11 @@ private:
 
             if (bev_image.empty())
             {
-                RCLCPP_ERROR(this->get_logger(), "Error: BEV image is empty after processing.");
-                return;
+                DEBUG_LOG("Error: BEV image is empty after processing.");
             }
 
             // Publish the BEV image
-            publish_bev_image(bev_image);
+            // publish_bev_image(bev_image);
         }
         catch (const cv_bridge::Exception& e)
         {
@@ -243,11 +239,14 @@ private:
 
         double min_depth, max_depth;
         cv::minMaxLoc(depth_map, &min_depth, &max_depth);
-        std::cout << "Depth map range: [" << min_depth << ", " << max_depth << "]" << std::endl;
+        DEBUG_LOG("Depth map range: [" << min_depth << ", " << max_depth << "]");
+
+        cv::Mat resizedImage;
+        cv::resize(depth_map, resizedImage, cv::Size(intrinsic_image_width_, intrinsic_image_height_));
 
         DEBUG_LOG("Ended Depth Inference");
 
-        return depth_map.clone();
+        return resizedImage.clone();
     }
 
     cv::Mat preprocess_image(const cv::Mat& inputImage, const size_t& imageWidth, const size_t& imageHeight) {
@@ -298,14 +297,6 @@ private:
         if (cv::countNonZero(depth_map) == 0)
         {
             RCLCPP_ERROR(this->get_logger(), "Error: Depth map contains only zeros.");
-            return cv::Mat();
-        }
-
-        if (depth_map.rows != depth_model_height_ || depth_map.cols != depth_model_width_)
-        {
-            RCLCPP_ERROR(this->get_logger(), 
-                        "Error: Depth map dimensions (%dx%d) do not match expected size (%dx%d).",
-                        depth_map.rows, depth_map.cols, depth_model_height_, depth_model_width_);
             return cv::Mat();
         }
 

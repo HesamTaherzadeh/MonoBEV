@@ -26,13 +26,14 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(bev_interface REQUIRED)
 find_package(yolo_msgs REQUIRED)
-
+find_package(TBB REQUIRED)
 # Include directories
 include_directories(
   include
   ${OpenCV_INCLUDE_DIRS}
   ${onnxruntime_INCLUDE_DIRS}
   ${CUDA_INCLUDE_DIRS}
+  ${TBB_INCLUDE_DIRS}
 )
 
 # Declare the executable
@@ -43,6 +44,7 @@ target_link_libraries(${PROJECT_NAME}_node
   onnxruntime
   ${CUDA_LIBRARIES}
   ${CUDNN_LIBRARY}
+  TBB::tbb
 )
 
 # Add dependencies for the executable
