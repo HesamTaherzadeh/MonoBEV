@@ -1,10 +1,18 @@
 #include <iostream>
+#include <utils.hpp>
 
 #ifdef BEV_DEBUG_OUTPUT
     #define DEBUG_LOG(msg) std::cout << msg << std::endl
 #else
     #define DEBUG_LOG(msg)
 #endif
+
+#ifdef ENABLE_TIMING
+    #define TIMER_SCOPE(name) Timer timer##__LINE__(name)
+#else
+    #define TIMER_SCOPE(name)
+#endif
+
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -55,19 +63,25 @@ public:
         load_parameters();
 
         // Create publishers and subscribers
-        rclcpp::QoS qos_best_effort = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor_data));
+        static const rmw_qos_profile_t rmw_qos_profile_sensor = 
+                {RMW_QOS_POLICY_HISTORY_KEEP_LAST,1,RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+                RMW_QOS_POLICY_DURABILITY_VOLATILE,RMW_QOS_DEADLINE_DEFAULT,
+                RMW_QOS_LIFESPAN_DEFAULT,RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+                RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,false};
 
-        image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("BEV", qos_best_effort);
-        depth_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("depth", qos_best_effort);
-        rgb_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("rgb", qos_best_effort);
+        rclcpp::QoS qos_best_effort = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor));
 
-        camera_info_publisher_ = this->create_publisher<sensor_msgs::msg::CameraInfo>("camera_params", qos_best_effort);
+        image_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("/BEV", qos_best_effort);
+        depth_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("/depth", qos_best_effort);
+        rgb_publisher_ = this->create_publisher<sensor_msgs::msg::Image>("/rgb", qos_best_effort);
+
+        camera_info_publisher_ = this->create_publisher<sensor_msgs::msg::CameraInfo>("/camera_params", qos_best_effort);
 
         image_subscriber_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/kitti/camera_color_left/image_raw", 0,
             std::bind(&BEVNode::image_callback, this, std::placeholders::_1));
         
-        homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("homography", qos_best_effort);
+        homography_publisher_ = this->create_publisher<bev_interface::msg::Homography>("/homography", qos_best_effort);
 
 
         // Initialize model and camera parameters
@@ -208,7 +222,17 @@ private:
     {
         DEBUG_LOG("Loading model...");
         env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "depth_to_bev");
+        OrtCUDAProviderOptions cuda_options;
+        cuda_options.device_id = 0;
+        cuda_options.arena_extend_strategy = 0;
+        cuda_options.gpu_mem_limit = SIZE_MAX;
+        cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchExhaustive;
+        cuda_options.do_copy_in_default_stream = 1;
+
         Ort::SessionOptions session_options;
+        session_options.AppendExecutionProvider_CUDA(cuda_options);
+
+
         session_ = std::make_unique<Ort::Session>(*env_, model_path_.c_str(), session_options);
         DEBUG_LOG("Model loaded from path: " << model_path_);
     }
@@ -246,7 +270,7 @@ private:
 
         DEBUG_LOG("Ended Depth Inference");
 
-        return resizedImage.clone();
+        return resizedImage;
     }
 
     cv::Mat preprocess_image(const cv::Mat& inputImage, const size_t& imageWidth, const size_t& imageHeight) {
@@ -279,63 +303,61 @@ private:
         return chwImage;
     }
 
-    cv::Mat process_image_to_bev(const cv::Mat& input_image, const std_msgs::msg::Header&  header)
-    {
+    cv::Mat process_image_to_bev(const cv::Mat& input_image, const std_msgs::msg::Header& header) {
+        TIMER_SCOPE("Total BEV Process");
         DEBUG_LOG("Started BEV process");
 
-        cv::Mat depth_map = run_model_inference(input_image);
-
-        if (depth_map.empty())
+        cv::Mat depth_map;
         {
-            RCLCPP_ERROR(this->get_logger(), "Error: Depth map is empty after inference.");
-            return cv::Mat();
-        }
-        else{
+            TIMER_SCOPE("Depth Model Inference");
+            depth_map = run_model_inference(input_image);
+
+            if (depth_map.empty()) {
+                RCLCPP_ERROR(this->get_logger(), "Error: Depth map is empty after inference.");
+                return cv::Mat();
+            }
+
             publish_depth_image(depth_map, header);
-        }
 
-        if (cv::countNonZero(depth_map) == 0)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Error: Depth map contains only zeros.");
-            return cv::Mat();
+            if (cv::countNonZero(depth_map) == 0) {
+                RCLCPP_ERROR(this->get_logger(), "Error: Depth map contains only zeros.");
+                return cv::Mat();
+            }
         }
 
         DEBUG_LOG("Depth map inference completed.");
 
-        HomographyTransformer transformer(output_width_, output_height_, intrinsic_, depth_map,
-                                        multiplication_ratio_, starting_x_, starting_y_);
+        HomographyTransformer transformer(
+            output_width_, output_height_, intrinsic_, depth_map,
+            multiplication_ratio_, starting_x_, starting_y_);
 
         std::vector<cv::Point2f> image_points, ground_points;
-        select_correspondences(depth_map, intrinsic_, image_points, ground_points);
 
-        if (image_points.size() < 4 || ground_points.size() < 4)
         {
-            RCLCPP_ERROR(this->get_logger(), 
-                        "Error: Insufficient correspondences for homography computation. "
-                        "Image points: %zu, Ground points: %zu.", 
-                        image_points.size(), ground_points.size());
-            return cv::Mat();
+            TIMER_SCOPE("Select Correspondences");
+            select_correspondences(depth_map, intrinsic_, image_points, ground_points);
+
+            if (image_points.size() < 4 || ground_points.size() < 4) {
+                RCLCPP_ERROR(this->get_logger(),
+                            "Error: Insufficient correspondences for homography computation. "
+                            "Image points: %zu, Ground points: %zu.",
+                            image_points.size(), ground_points.size());
+                return cv::Mat();
+            }
         }
 
-        try
-        {
+        try {
+            TIMER_SCOPE("Compute Homography");
             transformer.compute_homography(image_points, ground_points);
-        }
-
-
-        catch (const std::exception& e)
-        {
+        } catch (const std::exception& e) {
             RCLCPP_ERROR(this->get_logger(), "Error computing homography: %s", e.what());
             return cv::Mat();
         }
 
-        // cv::Mat undistorted_image = transformer.undistort_image(input_image);
-
-        // cv::Mat bev_image = transformer.transform_image(undistorted_image);
-
         DEBUG_LOG("BEV process completed.");
         return cv::Mat();
     }
+
 
     void publish_depth_image(const cv::Mat& depth_map, const std_msgs::msg::Header& header)
         {
