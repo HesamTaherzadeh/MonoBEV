@@ -75,9 +75,13 @@ install(DIRECTORY cfg/
   DESTINATION share/${PROJECT_NAME}/cfg
 )
 
+install(DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf
+)
 install(
   PROGRAMS
     scripts/ogm.py
+    scripts/ego.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
