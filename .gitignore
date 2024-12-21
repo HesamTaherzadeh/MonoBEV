@@ -8,3 +8,4 @@ install
 logs/
 log/
 todo
+vis_traj.py

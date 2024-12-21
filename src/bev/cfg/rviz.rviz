@@ -10,6 +10,8 @@ Panels:
         - /Image2
         - /MarkerArray1
         - /Odometry1
+        - /Odometry1/Status1
+        - /Odometry1/Shape1
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz_common/Selection
@@ -128,8 +130,8 @@ Visualization Manager:
       Position Tolerance: 0.10000000149011612
       Shape:
         Alpha: 1
-        Axes Length: 1
-        Axes Radius: 0.10000000149011612
+        Axes Length: 10
+        Axes Radius: 1
         Color: 255; 25; 0
         Head Length: 0.30000001192092896
         Head Radius: 0.10000000149011612
@@ -142,7 +144,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /odometry/filtered
+        Value: /ego/odometry
       Value: true
   Enabled: true
   Global Options:
@@ -190,7 +192,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 17.06538200378418
+      Distance: 2.6071414947509766
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -205,10 +207,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.3403973579406738
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.6085574626922607
+      Yaw: 2.0735421180725098
     Saved: ~
 Window Geometry:
   Displays:

@@ -2,131 +2,139 @@
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Imu, NavSatFix
-from geometry_msgs.msg import TwistStamped
+from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry
-from message_filters import ApproximateTimeSynchronizer, Subscriber
-from pyproj import CRS, Transformer
-import math
+from geometry_msgs.msg import Pose, Point, Quaternion
+import numpy as np
 
 
-class EgoOdometryNode(Node):
+class GPSConverter:
     def __init__(self):
-        super().__init__('ego_node')
-        self.get_logger().info("Ego Node: Subscribing to IMU and GPS data with Approximate Sync")
+        self.a = 6378137.0  # Semi-major axis
+        self.f_inv = 298.257223563  # Inverse flattening
+        self.f = 1.0 / self.f_inv
 
-        # Subscribers with message_filters
-        self.imu_sub = Subscriber(self, Imu, '/kitti/oxts/imu')
-        self.gps_sub = Subscriber(self, NavSatFix, '/kitti/oxts/gps/fix')
-        self.vel_sub = Subscriber(self, TwistStamped, '/kitti/oxts/gps/vel')
+    def geodetic_to_ecef(self, lat, lon, alt):
+        """
+        Convert geodetic coordinates to ECEF coordinates.
+        lat, lon in degrees, alt in meters.
+        """
+        lat_rad = np.radians(lat)
+        lon_rad = np.radians(lon)
 
-        # Synchronize the topics with ApproximateTimeSynchronizer
-        self.sync = ApproximateTimeSynchronizer([self.imu_sub, self.gps_sub, self.vel_sub], queue_size=10, slop=0.1)
-        self.sync.registerCallback(self.sync_callback)
+        N = self.a / np.sqrt(1 - (self.f * (2 - self.f) * np.sin(lat_rad) ** 2))
+        X = (N + alt) * np.cos(lat_rad) * np.cos(lon_rad)
+        Y = (N + alt) * np.cos(lat_rad) * np.sin(lon_rad)
+        Z = ((1 - self.f) * (1 - self.f) * N + alt) * np.sin(lat_rad)
+
+        return np.array([X, Y, Z])
+
+    def geo_to_enu(self, geodetic, origin_lat, origin_lon, origin_alt):
+        """
+        Convert geodetic coordinates to ENU coordinates.
+        geodetic: np.array([lat, lon, alt])
+        origin_lat, origin_lon, origin_alt: reference point for ENU origin
+        """
+        # Convert origin to ECEF
+        origin_ecef = self.geodetic_to_ecef(origin_lat, origin_lon, origin_alt)
+
+        # Convert geodetic point to ECEF
+        ecef = self.geodetic_to_ecef(geodetic[0], geodetic[1], geodetic[2])
+
+        # Compute rotation matrix R
+        lon_rad = np.radians(origin_lon)
+        lat_rad = np.radians(origin_lat)
+
+        sin_lon = np.sin(lon_rad)
+        cos_lon = np.cos(lon_rad)
+        sin_lat = np.sin(lat_rad)
+        cos_lat = np.cos(lat_rad)
+
+        R = np.array([
+            [-sin_lon, cos_lon, 0],
+            [-sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat],
+            [cos_lat * cos_lon, cos_lat * sin_lon, sin_lat]
+        ])
+
+        # ENU coordinates
+        enu = R @ (ecef - origin_ecef)
+        return enu
+
+
+class GPSOdometryNode(Node):
+    def __init__(self):
+        super().__init__('gps_to_odometry_node')
+        self.get_logger().info("Starting GPS to ENU Odometry Node")
+
+        # Subscriber to NavSatFix
+        self.gps_subscriber = self.create_subscription(
+            NavSatFix,
+            '/kitti/oxts/gps/fix',
+            self.gps_callback,
+            10
+        )
 
         # Publisher for Odometry
         self.odom_publisher = self.create_publisher(Odometry, '/ego/odometry', 10)
 
-        # Flag and storage for origin
+        # GPS Converter and origin setup
+        self.converter = GPSConverter()
         self.origin_set = False
         self.origin_lat = None
         self.origin_lon = None
         self.origin_alt = None
 
-        # Setup transformers
-        self.wgs84 = CRS.from_epsg(4326)   # WGS84 lat/lon
-        self.ecef = CRS.from_epsg(4978)    # ECEF
-        self.transform_to_ecef = Transformer.from_crs(self.wgs84, self.ecef, always_xy=True)
+    def gps_callback(self, msg: NavSatFix):
+        """
+        Callback function for GPS messages.
+        """
+        latitude = msg.latitude
+        longitude = msg.longitude
+        altitude = msg.altitude
 
-    def sync_callback(self, imu_msg: Imu, gps_msg: NavSatFix, vel_msg: TwistStamped):
-        """
-        Callback function for synchronized IMU, GPS, and velocity data.
-        """
-        # Store the first GPS reading as origin
+        # Set origin on the first GPS message
         if not self.origin_set:
-            self.origin_lat = gps_msg.latitude
-            self.origin_lon = gps_msg.longitude
-            self.origin_alt = gps_msg.altitude
-            self.origin_x, self.origin_y, self.origin_z = self.latlon_to_ecef(self.origin_lat, self.origin_lon, self.origin_alt)
+            self.origin_lat = latitude
+            self.origin_lon = longitude
+            self.origin_alt = altitude
             self.origin_set = True
-            self.get_logger().info("Origin set at Lat: {:.6f}, Lon: {:.6f}, Alt: {:.2f}".format(
-                self.origin_lat, self.origin_lon, self.origin_alt
-            ))
+            self.get_logger().info(
+                f"Origin set at Lat: {latitude}, Lon: {longitude}, Alt: {altitude}"
+            )
+            return
 
-        # Convert current GPS to ENU
-        position_e, position_n, position_u = self.latlon_to_enu(gps_msg.latitude, gps_msg.longitude, gps_msg.altitude)
-
-        # Extract orientation (from IMU)
-        orientation_quat = imu_msg.orientation
-
-        # Extract velocity
-        velocity = vel_msg.twist.linear
+        # Convert GPS to ENU
+        enu_coords = self.converter.geo_to_enu(
+            [latitude, longitude, altitude],
+            self.origin_lat,
+            self.origin_lon,
+            self.origin_alt
+        )
 
         # Create and populate the Odometry message
         odom_msg = Odometry()
-        odom_msg.header.stamp = gps_msg.header.stamp  # Use GPS timestamp for consistency
+        odom_msg.header.stamp = self.get_clock().now().to_msg()
         odom_msg.header.frame_id = "odom"
-        odom_msg.child_frame_id = "world"
+        odom_msg.child_frame_id = "base_link"
 
-        # Position in ENU frame
-        odom_msg.pose.pose.position.x = position_e
-        odom_msg.pose.pose.position.y = position_n
-        odom_msg.pose.pose.position.z = 0.0
+        # Set ENU position
+        odom_msg.pose.pose.position = Point(
+            x=enu_coords[0],
+            y=enu_coords[1],
+            z=enu_coords[2]
+        )
 
-        # Orientation
-        odom_msg.pose.pose.orientation = orientation_quat
+        # Orientation set to neutral (no rotation, ENU aligned)
+        odom_msg.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
 
-        # Publish Odometry
+        # Publish the Odometry message
         self.odom_publisher.publish(odom_msg)
-        self.get_logger().info(f"Published Odometry at time: {gps_msg.header.stamp.sec}.{gps_msg.header.stamp.nanosec}")
-
-    def latlon_to_ecef(self, lat, lon, alt):
-        """
-        Convert lat/lon/alt (WGS84) to ECEF coordinates (X,Y,Z).
-        lat, lon in degrees, alt in meters.
-        """
-        # Note: Transformer expects coordinates in (lon, lat, alt) and in degrees.
-        x, y, z = self.transform_to_ecef.transform(lat, lon, alt)
-        return x, y, z
-
-    def latlon_to_enu(self, lat, lon, alt):
-        """
-        Convert lat/lon/alt to local ENU coordinates relative to the stored origin.
-        """
-        # Get ECEF of current point
-        X, Y, Z = self.latlon_to_ecef(lat, lon, alt)
-
-        # Differences from origin
-        dX = X - self.origin_x
-        dY = Y - self.origin_y
-        dZ = Z - self.origin_z
-
-        # Convert lat, lon to radians for trig
-        lat0 = math.radians(self.origin_lat)
-        lon0 = math.radians(self.origin_lon)
-
-        # ECEF to ENU rotation
-        # Reference: standard formulas for ECEF->ENU
-        sin_lat0 = math.sin(lat0)
-        cos_lat0 = math.cos(lat0)
-        sin_lon0 = math.sin(lon0)
-        cos_lon0 = math.cos(lon0)
-
-        # Rotation matrix applied to delta ECEF coordinates:
-        # [e]   [ -sin_lon0        cos_lon0           0 ] [dX]
-        # [n] = [ -cos_lon0*sin_lat0 -sin_lon0*sin_lat0 cos_lat0 ] [dY]
-        # [u]   [ cos_lon0*cos_lat0  sin_lon0*cos_lat0 sin_lat0  ] [dZ]
-
-        e = -sin_lon0*dX + cos_lon0*dY
-        n = (-cos_lon0*sin_lat0)*dX + (-sin_lon0*sin_lat0)*dY + cos_lat0*dZ
-        u = (cos_lon0*cos_lat0)*dX + (sin_lon0*cos_lat0)*dY + sin_lat0*dZ
-
-        return dX, dY, dZ
+        self.get_logger().info(f"Published ENU Odometry: x={enu_coords[0]}, y={enu_coords[1]}, z={enu_coords[2]}")
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = EgoOdometryNode()
+    node = GPSOdometryNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
