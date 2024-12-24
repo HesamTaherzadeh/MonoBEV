@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
 <robot name="kitti_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-
   <!-- Base link -->
   <link name="base_link">
     <inertial>
@@ -10,20 +9,27 @@
     </inertial>
   </link>
 
-  <!-- IMU frame -->
+  <!-- IMU link -->
   <link name="imu_link"/>
   <joint name="base_to_imu" type="fixed">
     <parent link="base_link"/>
     <child link="imu_link"/>
+    <origin xyz="0 0 0.0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera link -->
+  <link name="camera_color_left"/>
+  <joint name="base_to_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_color_left"/>
     <origin xyz="0 0 0.0" rpy="0 0 0"/> 
   </joint>
 
-  <!-- GPS frame -->
+  <!-- GPS link -->
   <link name="gps_link"/>
   <joint name="base_to_gps" type="fixed">
     <parent link="base_link"/>
     <child link="gps_link"/>
     <origin xyz="0 0 0" rpy="0 0 0"/> 
   </joint>
-
 </robot>

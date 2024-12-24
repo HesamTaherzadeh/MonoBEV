@@ -2,150 +2,198 @@
 
 import rclpy
 from rclpy.node import Node
-import numpy as np
 
-from bev_interface.msg import Homography
-from yolo_msgs.msg import DetectionArray
+# ROS messages
 from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
 from std_msgs.msg import Header
 
-class BEVOccupancyNode(Node):
+# Suppose this is your YOLO detection message
+from yolo_msgs.msg import Detection, DetectionArray  # Adjust import path as needed
+import numpy as np
+
+
+class BoundingBoxOccupancyNode(Node):
     def __init__(self):
-        super().__init__('bev_occupancy_node')
-        print("initiated")
-        
-        # Subscribers
-        self.homography_sub = self.create_subscription(
-            Homography,
-            '/homography',
-            self.homography_callback,
-            10
-        )
-        
+        super().__init__('bounding_box_occupancy_node')
+        self.get_logger().info("Starting BoundingBoxOccupancyNode")
+
+        # Subscriber to bounding box detections
         self.detection_sub = self.create_subscription(
             DetectionArray,
-            '/yolo/detections',
-            self.detection_callback,
+            '/yolo/detections_3d',    
+            self.detections_callback,
+            100
+        )
+
+        # Publisher for OccupancyGrid
+        self.occupancy_pub = self.create_publisher(
+            OccupancyGrid,
+            '/bev/occupancy',
             10
         )
-        
-        # Publisher
-        self.occ_pub = self.create_publisher(OccupancyGrid, '/bev/occupancy_grid', 10)
-        
-        # Store homography
-        self.homography_matrix = None
-        
-        # Define Occupancy Grid parameters
-        self.grid_width = 100
-        self.grid_height = 100
-        self.grid_resolution = 0.1  # meters per cell
-        self.grid_origin_x = 0.0
-        self.grid_origin_y = 0.0
-        
-        # Initialize occupancy grid data
-        self.occupancy_data = [0] * (self.grid_width * self.grid_height)
-        
-        # Timer to periodically publish occupancy grid
-        self.timer = self.create_timer(1.0, self.publish_occupancy_grid)
 
-    def homography_callback(self, msg: Homography):
-        # Extract 3x3 matrix
-        print("Recieved homography")
-        mat = np.array(msg.matrix).reshape((3,3))
-        self.homography_matrix = mat
-        self.get_logger().info("Homography matrix updated.")
+        # Initialize a simple occupancy grid
+        self.resolution = 0.1  # 10 cm per cell
+        self.grid_width = 200  # number of cells in x
+        self.grid_height = 200 # number of cells in y
+        # The origin of the occupancy grid (bottom-left corner in world coordinates)
+        self.origin_x = -10.0
+        self.origin_y = -10.0
 
-    def detection_callback(self, msg):
-        print("Recieved Detection")
-        if self.homography_matrix is None:
-            self.get_logger().warn("No homography received yet; cannot process detection.")
-            return
+        # Homography matrix (3x3) - you must define or compute this
+        # Example placeholder: identity matrix
+        self.H = np.eye(3)
 
-        # Extract bounding box corners in image coordinates
-        # Assuming bbox has fields: x, y, width, height (top-left origin)
-        x = msg.bbox.center.x - (msg.bbox.size_x/2.0)
-        y = msg.bbox.center.y - (msg.bbox.size_y/2.0)
-        w = msg.bbox.size_x
-        h = msg.bbox.size_y
+    def detections_callback(self, detection_msg: Detection):
+        """
+        Callback for each detection from YOLO. We extract the 3D box,
+        project onto the ground, then fill the occupancy grid.
+        """
+        self.get_logger().info("Inside callback, processing detections")
 
-        corners = [
-            [x, y],            # top-left
-            [x + w, y],        # top-right
-            [x, y + h],        # bottom-left
-            [x + w, y + h]     # bottom-right
-        ]
+        # Initialize an empty occupancy grid
+        occupancy_grid = self.create_empty_grid()
 
-        # Transform each corner using the homography
-        bev_points = []
-        for (u,v) in corners:
-            uv1 = np.array([u,v,1.0])
-            X = self.homography_matrix @ uv1
-            if X[2] != 0:
-                X /= X[2]
-            bev_points.append((X[0], X[1]))
+        # Iterate through each detection in the list
+        for detection in detection_msg.detections:
+            # 1. Parse 3D bounding box info
+            center_pose = detection.bbox3d.center  # geometry_msgs/Pose
+            size = detection.bbox3d.size          # geometry_msgs/Vector3
+            frame_id = detection.bbox3d.frame_id  # e.g. "odom"
 
-        # Convert BEV coordinates to occupancy grid indices and mark them
-        self.mark_detection_in_grid(bev_points)
+            # Log the details of the detection (optional, for debugging)
+            self.get_logger().info(
+                f"Processing detection: Class={detection.class_name}, Score={detection.score}, "
+                f"Center=({center_pose.position.x}, {center_pose.position.y}, {center_pose.position.z}), "
+                f"Size=({size.x}, {size.y}, {size.z})"
+            )
 
-    def mark_detection_in_grid(self, bev_points):
-        # Find bounding box in BEV coords (min_x, max_x, min_y, max_y)
-        bev_x_coords = [p[0] for p in bev_points]
-        bev_y_coords = [p[1] for p in bev_points]
-        
-        min_x = min(bev_x_coords)
-        max_x = max(bev_x_coords)
-        min_y = min(bev_y_coords)
-        max_y = max(bev_y_coords)
+            # 2. Compute bounding box corner points (in 3D)
+            corners_3d = self.compute_3d_corners(center_pose, size)
 
-        # Convert to grid coordinates
-        # grid cell = (X - origin_x)/resolution
-        def to_grid(x, y):
-            gx = int((x - self.grid_origin_x) / self.grid_resolution)
-            gy = int((y - self.grid_origin_y) / self.grid_resolution)
-            return gx, gy
+            # 3. Project corners onto ground plane
+            corners_2d = self.project_corners_homography(corners_3d)
 
-        gmin_x, gmin_y = to_grid(min_x, min_y)
-        gmax_x, gmax_y = to_grid(max_x, max_y)
+            # 4. Mark these corners on the occupancy grid
+            # This function updates the occupancy grid data for each bounding box
+            occupancy_grid.data = self.fill_occupancy_grid(occupancy_grid, corners_2d)
 
-        # Clamp values to grid boundaries
-        gmin_x = max(0, min(gmin_x, self.grid_width - 1))
-        gmax_x = max(0, min(gmax_x, self.grid_width - 1))
-        gmin_y = max(0, min(gmin_y, self.grid_height - 1))
-        gmax_y = max(0, min(gmax_y, self.grid_height - 1))
+        # 5. Publish the updated occupancy grid
+        self.occupancy_pub.publish(occupancy_grid)
+        self.get_logger().info("Published updated occupancy grid")
 
-        # Mark these cells as occupied (e.g., 100)
-        for gx in range(gmin_x, gmax_x + 1):
-            for gy in range(gmin_y, gmax_y + 1):
-                idx = gy * self.grid_width + gx
-                self.occupancy_data[idx] = 100
 
-        self.get_logger().info("Marked detection area on BEV occupancy grid.")
+    def compute_3d_corners(self, center_pose: Pose, size: Vector3):
+        """
+        Compute the 8 corners of the 3D bounding box relative to its center.
+        This example assumes the bounding box is axis-aligned in the frame it is given.
+        If there's orientation in center_pose.orientation, you must rotate these corners accordingly.
+        """
+        cx, cy, cz = center_pose.position.x, center_pose.position.y, center_pose.position.z
+        dx, dy, dz = size.x, size.y, size.z
 
-    def publish_occupancy_grid(self):
-        # Create occupancy grid message
-        occ_msg = OccupancyGrid()
-        occ_msg.header = Header()
-        occ_msg.header.stamp = self.get_clock().now().to_msg()
-        occ_msg.header.frame_id = "map"  # or "base_link", adjust as needed
+        # Half-dimensions
+        hx, hy, hz = dx/2.0, dy/2.0, dz/2.0
 
-        occ_msg.info.map_load_time = occ_msg.header.stamp
-        occ_msg.info.resolution = self.grid_resolution
-        occ_msg.info.width = self.grid_width
-        occ_msg.info.height = self.grid_height
-        occ_msg.info.origin.position.x = self.grid_origin_x
-        occ_msg.info.origin.position.y = self.grid_origin_y
-        occ_msg.info.origin.position.z = 0.0
-        occ_msg.info.origin.orientation.w = 1.0
+        # 8 corners in local bounding-box coordinates
+        corners = np.array([
+            [ cx - hx, cy - hy, cz - hz ],
+            [ cx - hx, cy - hy, cz + hz ],
+            [ cx - hx, cy + hy, cz - hz ],
+            [ cx - hx, cy + hy, cz + hz ],
+            [ cx + hx, cy - hy, cz - hz ],
+            [ cx + hx, cy - hy, cz + hz ],
+            [ cx + hx, cy + hy, cz - hz ],
+            [ cx + hx, cy + hy, cz + hz ],
+        ])
 
-        occ_msg.data = self.occupancy_data
-        self.occ_pub.publish(occ_msg)
-        self.get_logger().debug("Published occupancy grid.")
+        # TODO: If orientation is non-zero, rotate these corners around (cx,cy,cz).
+        # For brevity, not shown here.
+
+        return corners
+
+    def project_corners_homography(self, corners_3d):
+        """
+        Project the 3D corners onto a 2D ground plane using a homography matrix H (3x3).
+        Typically, you'd do something like:
+             [u, v, w]^T = H * [X, Y, Z]^T
+        and then (u'/w, v'/w) = the 2D pixel/plane coords.
+
+        If your bounding box is already in an "odom" or "map" frame where Z=0 is the ground,
+        you might just do corners_2d = (X, Y).
+        """
+        corners_2d = []
+        for corner in corners_3d:
+            X, Y, Z = corner[0], corner[1], corner[2]
+
+            # Example: If Z ~ 0 is ground, a naive projection might be just (X, Y)
+            # corners_2d.append([X, Y])
+
+            # Or apply the homography (assuming [X, Y, 1] input and ignoring Z):
+            # This is a simplified approach. In real usage, you need the correct H that accounts for Z as well.
+            vec_3x1 = np.array([X, Y, 1.0])
+            uvw = self.H @ vec_3x1
+            u, v, w = uvw[0], uvw[1], uvw[2] if abs(uvw[2]) > 1e-9 else 1e-9
+            corners_2d.append([u / w, v / w])
+        return corners_2d
+
+    def create_empty_grid(self):
+        """
+        Create a nav_msgs/OccupancyGrid with the correct metadata,
+        filled initially with -1 (unknown).
+        """
+        grid = OccupancyGrid()
+        grid.header = Header()
+        grid.header.stamp = self.get_clock().now().to_msg()
+        grid.header.frame_id = 'odom'  # or 'map', etc.
+
+        # Grid metadata
+        grid.info.resolution = self.resolution
+        grid.info.width = self.grid_width
+        grid.info.height = self.grid_height
+        # OccupancyGrid origin: bottom-left corner in world coords
+        grid.info.origin.position.x = self.origin_x
+        grid.info.origin.position.y = self.origin_y
+        grid.info.origin.position.z = 0.0
+        grid.info.origin.orientation.w = 1.0
+
+        # Initialize data array
+        num_cells = self.grid_width * self.grid_height
+        grid.data = [-1] * num_cells  # -1 => unknown
+        return grid
+
+    def fill_occupancy_grid(self, grid, corners_2d):
+        """
+        Mark cells as "occupied" (e.g., 100) inside the projected bounding box polygon.
+        A simplistic approach is to rasterize the polygon in grid coordinates.
+        """
+        data = list(grid.data)
+
+        # Convert from world (u, v) => grid (col, row)
+        def world_to_grid(u, v):
+            col = int((u - self.origin_x) / self.resolution)
+            row = int((v - self.origin_y) / self.resolution)
+            return (col, row)
+
+        # We’ll just mark the corners in this minimal example, 
+        # but you should implement a polygon fill/rasterization.
+        for (u, v) in corners_2d:
+            col, row = world_to_grid(u, v)
+            if 0 <= col < self.grid_width and 0 <= row < self.grid_height:
+                index = row * self.grid_width + col
+                data[index] = 100  # Mark cell as occupied
+
+        return data
+
 
 def main(args=None):
     rclpy.init(args=args)
-    node = BEVOccupancyNode()
+    node = BoundingBoxOccupancyNode()
     rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()

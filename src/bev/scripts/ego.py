@@ -4,8 +4,10 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Pose, Point, Quaternion
+from geometry_msgs.msg import Pose, Point, Quaternion, TransformStamped
 import numpy as np
+
+from tf2_ros import TransformBroadcaster
 
 
 class GPSConverter:
@@ -67,6 +69,7 @@ class GPSOdometryNode(Node):
         self.get_logger().info("Starting GPS to ENU Odometry Node")
 
         # Subscriber to NavSatFix
+        self.tf_broadcaster = TransformBroadcaster(self)
         self.gps_subscriber = self.create_subscription(
             NavSatFix,
             '/kitti/oxts/gps/fix',
@@ -126,6 +129,20 @@ class GPSOdometryNode(Node):
 
         # Orientation set to neutral (no rotation, ENU aligned)
         odom_msg.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        
+        transform_stamped = TransformStamped()
+        transform_stamped.header.stamp = odom_msg.header.stamp
+        transform_stamped.header.frame_id = "odom"
+        transform_stamped.child_frame_id = "base_link"
+
+        transform_stamped.transform.translation.x = odom_msg.pose.pose.position.x
+        transform_stamped.transform.translation.y = odom_msg.pose.pose.position.y
+        transform_stamped.transform.translation.z = odom_msg.pose.pose.position.z
+
+        transform_stamped.transform.rotation = odom_msg.pose.pose.orientation
+
+        self.tf_broadcaster.sendTransform(transform_stamped)
+
 
         # Publish the Odometry message
         self.odom_publisher.publish(odom_msg)
