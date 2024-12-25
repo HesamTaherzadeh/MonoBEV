@@ -67,6 +67,20 @@ def generate_launch_description():
             output='screen',
             parameters=[ekf_config_file]
         ),
+        
+        Node(
+            package='bev',
+            executable='ego.py',
+            name='ego',
+            output='screen'
+        ),
+        
+        Node(
+            package='bev',
+            executable='ogm.py',
+            name='ogm',
+            output='screen'
+            ),
 
          Node(
             package='tf2_ros',
